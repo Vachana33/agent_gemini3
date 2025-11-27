@@ -1,30 +1,31 @@
 from google import genai
 from google.genai import types
+
+import tools
  
 class Agent:
-    def __init__(self, model: str):
+    def __init__(self, model: str,tools: list[dict]):
         self.model = model
         self.client = genai.Client()
         self.contents = []
-        
+        self.tools = tools
+ 
     def run(self, contents: str):
         self.contents.append({"role": "user", "parts": [{"text": contents}]})
  
-        response = self.client.models.generate_content(model=self.model, contents=self.contents)
+        config = types.GenerateContentConfig(
+            tools=[types.Tool(function_declarations=[tool["definition"] for tool in self.tools.values()])],
+        )
+ 
+        response = self.client.models.generate_content(model=self.model, contents=self.contents, config=config)
         self.contents.append(response.candidates[0].content)
  
         return response
  
-agent = Agent(model="gemini-3-pro-preview")
-response1 = agent.run(
-    contents="Hello, What are top 3 cities in Germany to visit? Only return the names of the cities."
-)
+agent = Agent(model="gemini-3-pro-preview", tools=tools)
  
-print(f"Model: {response1.text}")
-# Output: Berlin, Munich, Cologne 
-response2 = agent.run(
-    contents="Tell me something about the second city."
+response = agent.run(
+    contents="Can you list my files in the current directory?"
 )
- 
-print(f"Model: {response2.text}")
-# Output: Munich is the capital of Bavaria and is known for its Oktoberfest.
+print(response.function_calls)
+# Output: [FunctionCall(name='list_dir', arguments={'directory_path': '.'})]
